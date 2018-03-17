@@ -11,10 +11,13 @@
    - *KNN_sklearn.py*使用机器学习库来对手写数字的分类
    - *testDigits/trainingDigits/*为手写数字数据集的测试集和训练集，其中每个txt文件为32x32个像素值
    
+
 **2018-03-17**
 ### XGBoost算法
+
 - 1.数据的预处理以及skleaen包进行XGBoost实现
    - **XGBoost使用.ipynb**介绍具体使用和文件处理
+
 - 2.XGBoost预测台风实例
    - **xgboost数据预处理.ipynb**将*data*文件夹中的*.mat*文件转化成为*.csv*文件，其中，必须在同一文件夹下才能正常运行；
    - 数据文件为*X_noyear.csv*和*Y_noyear.csv*两个，数据类型为(66, 498)，(66,)；
