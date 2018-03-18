@@ -7,3 +7,8 @@
 
 ### 运行
 > python XGBoost.py
+
+### 更新
+
+1. 对原始数据集进行分开，分为训练集和测试集且二者互不交叉。文件为：*X_50.csv*和*Y_50.csv*,*X_16.csv*和*Y_16.csv*；
+2. 通过对*learning_rate*,*max_depth*,*n_exstmitor*三个参数进行试验，最优分数为0.47；
