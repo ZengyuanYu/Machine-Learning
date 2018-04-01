@@ -14,10 +14,10 @@ from sklearn.model_selection import TimeSeriesSplit
 
 
 def GDBTTrain(X, y):
-	train_x, test_x, train_y, test_y = train_test_split(X, y, test_size=0.001, random_state=0)  ##test_size测试集合所占比例
+	train_x, test_x, train_y, test_y = train_test_split(X, y, test_size=0.1, random_state=0)  ##test_size测试集合所占比例
 	test_preds = pd.DataFrame({"label": test_y})
 	clf = XGBRegressor(
-		learning_rate=0.1,  # 默认0.3
+		learning_rate=0.01,  # 默认0.3
 		n_estimators=500,  # 树的个数
 		max_depth=6,
 		# min_child_weight=1,
@@ -29,8 +29,8 @@ def GDBTTrain(X, y):
 	clf.fit(train_x, train_y)
 	test_preds['y_pred'] = clf.predict(test_x)
 	stdm = metrics.r2_score(test_preds['label'], test_preds['y_pred'])
-	a = cross_val_score(clf, X, y, cv=3)
-	print(a)
+	loss = -cross_val_score(clf, X, y, cv=10, scoring='neg_mean_squared_error')
+	print("交叉验证平方差", loss.mean())
 	import matplotlib.pyplot as plt  # 画出预测结果图
 	p = test_preds[['label', 'y_pred']].plot(subplots=True, style=['b-o', 'r-*'])
 	plt.plot(test_preds['label'], c='blue')
@@ -43,12 +43,8 @@ def GDBTTrain(X, y):
 def GDBTest(X, y, clf):
 	test_preds = pd.DataFrame({"label": y})
 	test_preds['y_pred'] = clf.predict(X)
-	print(len(test_preds))
-	# # 对预测的结果取整
-	# for i in range(16):
-	# 	test_preds['y_pred'][i] = round(test_preds['y_pred'][i])
-	# 	i += 1
-	#
+	print("验证集的个数", len(test_preds))
+	
 	error = 0.
 	# print(test_preds)
 	for i in range(16):
@@ -65,7 +61,7 @@ def GDBTest(X, y, clf):
 	plt.plot(test_preds['label'], c='blue')
 	plt.plot(test_preds['y_pred'], c='red')
 	plt.show()
-	return stdm
+	return stdm, test_preds
 
 
 def XGTSearch(X, y):
@@ -90,9 +86,33 @@ def XGTSearch(X, y):
 	return means, grid_result
 
 
+def find(X, y):
+	losses = []
+	n_estimators = range(1, 1000)
+	max_depths = range(2, 128)
+	
+	# for learning_rate in learning_rates:
+	
+	for n_estimator in n_estimators:
+		clf = XGBRegressor(
+			learning_rate=0.01,
+			max_depth=6,
+			n_estimators=n_estimator
+		)
+		loss = -cross_val_score(clf, X, y, cv=10, scoring='mean_squared_error')
+		losses.append(loss)
+		n_estimator += 50
+	
+	import matplotlib.pyplot as plt
+	plt.plot(n_estimators, loss)
+	plt.xlabel('x')
+	plt.ylabel('y')
+	plt.show()
+
+
 if __name__ == "__main__":
-	X_data_train = pd.read_csv('X_train.csv')
-	Y_data_train = pd.read_csv('Y_label.csv')
+	X_data_train = pd.read_csv('X_train_split.csv')
+	Y_data_train = pd.read_csv('Y_train_split.csv')
 	Y_data_train = Y_data_train[u'二噁英排放浓度']
 	out = 'frazee'
 	print("输入数据类型：", X_data_train.shape)
@@ -100,20 +120,61 @@ if __name__ == "__main__":
 	X = X_data_train.as_matrix()
 	y = Y_data_train.as_matrix()
 	stdm, clf = GDBTTrain(X, y)
+	
 	print('saving model')
 	path = './model/' + out + '_xgb.pkl'
 	with open(path, "wb") as f:
 		pickle.dump(clf, f)
 	print("训练r2_score结果", stdm)
-# a,b = XGTSearch(X, y)
-# 	X_data_test = pd.read_csv('X_16_feature.csv', encoding="gb18030")
-# 	Y_data_test = pd.read_csv('Y_16.csv', encoding="gb18030")
-# 	Y_data_test = Y_data_test['times']
-
-# 	X = X_data_test.as_matrix()
-# 	y = Y_data_test.as_matrix()
-# 	path = './model/' + out + '_xgb.pkl'
-# 	with open(path, 'rb') as f:
-# 		model = pickle.load(f)
-# 		stdm = GDBTest(X, y, model)
-# 		print("测试r2_score结果：", stdm)
+	# #a,b = XGTSearch(X, y)
+	
+	X_data_test = pd.read_csv('X_val_split.csv')[:20]
+	Y_data_test = pd.read_csv('Y_val_split.csv')[:20]
+	Y_data_test = Y_data_test[u'二噁英排放浓度']
+	
+	print("输入数据类型：", X_data_test.shape)
+	print("标签类型：", Y_data_test.shape)
+	X = X_data_test.as_matrix()
+	y = Y_data_test.as_matrix()
+	path = './model/' + out + '_xgb.pkl'
+	with open(path, 'rb') as f:
+		model = pickle.load(f)
+		stdm, prediction = GDBTest(X, y, model)
+		print("测试r2_score结果：", stdm)
+	print("实际值和预测值为：", prediction)
+	# #绘制特征相关度
+	# import matplotlib.pyplot as plt
+	# import numpy as np
+	# feature_importance = clf.feature_importances_
+	# feature_importance = 100.0*(feature_importance/feature_importance.max())
+	#
+	# #将列表中元素从小到大排列并返回其索引值
+	# sorted_idx = np.argsort(feature_importance)
+	#
+	# pos = np.arange(sorted_idx.shape[0]) + 0.5
+	# for i in range(len(sorted_idx)):
+	# 	print(feature_importance[sorted_idx[i]])
+	# fig = plt.figure(figsize=(12, 6))
+	# plt.subplot(1, 2, 1)
+	# plt.barh(pos, feature_importance[sorted_idx], align='center')
+	# #plt.yticks(pos, X_data_train.columns[sorted_idx])
+	# plt.yticks(pos, sorted_idx)
+	# plt.xlabel('Relative Importance')
+	# plt.title('Variable Importance')
+	# plt.show()
+	
+	# # 绘制实际结果和预测结果
+	# import matplotlib.pyplot as plt
+	# import numpy as np
+	#
+	# fig = plt.figure(figsize=(12, 6))
+	# plt.subplot(1, 2, 1)
+	# x = np.arange(len(prediction))
+	# plt.scatter(x[:10], prediction['y_pred'][0:10])
+	# plt.scatter(x[:10], prediction['label'][0:10], c='r')
+	# plt.ylim(0, 0.0015)
+	# plt.xlabel('number')
+	# plt.ylabel('value')
+	# plt.grid(True)
+	# plt.legend(labels=['pre', 'label'], loc='best')
+	# plt.show()
